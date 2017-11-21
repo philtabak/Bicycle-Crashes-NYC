@@ -1,0 +1,70 @@
+---
+title: "2016 Bicycle Crashes in New York by Police Precinct"
+author: "Philip Tabak"
+date: "November 20, 2017"
+output: html_document
+---
+This map incorporates the [2016 New York City Department of Tranport Bicycle Crash Data](http://www.nyc.gov/html/dot/html/bicyclists/bikestats.shtml#crashdata) and the [NYC OpenData Map of Police Precincts](https://data.cityofnewyork.us/Public-Safety/Police-Precincts/78dh-3ptz).
+
+Each Precinct is drawn on the map, the number of bicycle crashes, injuries to cyclists, fatalities to cyclists, injuries to motor vehiclists and fatalities to motor vehiclists are displayed in a pop when the cursor enters a precinct. Precincts with the highest number of crashes are colored the darkest, and the fewest the lightest.
+
+The bicycle crash data required minimal cleaning: conversion from PowerPoint, naming of columns, removal of subtotals. Cleaned up CSV file is available [here](bicycle_accidents.csv)
+
+Precinct data can be downloaded as a GeoJSON file. The geojsonio library makes the process of drawing this data onto a leaflet map very straightforward.
+
+
+```{r setup, include=TRUE, echo = TRUE, warning=FALSE, message = FALSE}
+
+library(leaflet)
+library(geojsonio)
+library(htmltools)
+library(rgdal)
+
+#Load data files
+precincts <-geojson_read("./Police Precincts.geojson", what = "sp" )
+accidents <- read.csv("./bicycle_accidents.csv")
+accidents$Precinct <- as.factor(accidents$Precinct ) 
+
+#this will be used to map continuous data to polygon shades on the map. See: https://rstudio.github.io/leaflet/colors.html 
+makePallete <- colorNumeric(palette = "Reds", domain = accidents$Crashes)
+
+#This function builds the label HTML.
+makeLabels <- function(p, c, i.b, f.b, i.m, f.m){
+  r <-  HTML(sprintf("Precinct: %s
+                     <br />Crashes: %s
+                     <br />Bicyclist Injuries: %s
+                     <br />Bicyclist Fatalities: %s
+                     <br />Motor Vehicle Occupant Injuries: %s
+                     <br />Motor Vehicle Occupant Falities: %s", 
+                     htmlEscape(p), 
+                     htmlEscape(c), 
+                     htmlEscape(i.b), 
+                     htmlEscape(f.b), 
+                     htmlEscape(i.m), 
+                     htmlEscape(f.m)
+                     )
+             )
+  return(r)
+}
+
+```
+
+
+
+```{r echo = TRUE, fig.height=6, fig.width=9}
+
+leaflet(precincts) %>% 
+  addTiles() %>%
+  addPolygons( label = mapply(makeLabels, 
+                              accidents$Precinct, 
+                              accidents$Crashes, 
+                              accidents$Bicyclist.Injuries, 
+                              accidents$Bicyclist.Fatalities, 
+                              accidents$Motor.Vehicle.Occupant.Injuries, 
+                              accidents$Motor.Vehicle.Occupant.Fatalities,
+                              SIMPLIFY = FALSE),
+  color = ~makePallete(accidents$Crashes), fillOpacity = 0.5) 
+
+  
+```
+
